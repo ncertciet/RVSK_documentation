@@ -1,4 +1,3 @@
-```dockerfile
 # =============================================================================
 # RVSK Accreditation Platform - Multi-stage Dockerfile
 # =============================================================================
@@ -86,4 +85,3 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
 
 # Start production API
 CMD ["node", "dist/main.js"]
-```
