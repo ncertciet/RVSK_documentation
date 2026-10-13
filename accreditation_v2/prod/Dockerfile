@@ -47,6 +47,8 @@ RUN npm ci --omit=dev && npm cache clean --force
 # ---------------------------------------------------------------------------
 FROM node:22-alpine AS production
 
+RUN apk add --no-cache wget
+
 # Security: add non-root user
 RUN addgroup -g 1001 -S appgroup && \
     adduser -S appuser -u 1001 -G appgroup
