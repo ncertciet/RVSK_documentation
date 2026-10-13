@@ -1,0 +1,178 @@
+pipeline {
+
+    agent any
+
+    environment {
+        DEPLOY_HOST    = "10.249.160.9"
+        DEPLOY_USER    = "nvsk-dev-user"
+        APP_DIR        = "/home/nvsk-dev-user/rvsk_accreditation_v2"
+        BRANCH         = "dev_acc_v2"
+
+        COMPOSE_FILE   = "docker-compose.dev.yml"
+        IMAGE_NAME     = "rvsk_accreditation_dev"
+        CONTAINER_NAME = "rvsk_accreditation_dev"
+
+        HEALTH_URL     = "https://api-nvsk.diksha.gov.in/accreditation/api/v1/health"
+    }
+
+    options {
+        timestamps()
+    }
+
+    stages {
+
+        stage('Deploy to DEV') {
+
+            steps {
+
+                sshagent(credentials: ['node-server-ssh']) {
+
+                    sh """
+ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} << EOF
+
+set -e
+
+echo "=========================================="
+echo "RVSK Accreditation DEV Deployment"
+echo "=========================================="
+
+cd ${APP_DIR}
+
+echo "Current Directory:"
+pwd
+
+echo ""
+echo "Current Branch:"
+git branch
+
+echo ""
+echo "Fetching latest source..."
+git fetch origin
+
+echo ""
+echo "Checking out ${BRANCH}..."
+git checkout ${BRANCH}
+
+echo ""
+echo "Pulling latest code..."
+git pull origin ${BRANCH}
+
+echo ""
+echo "Stopping existing container..."
+docker compose -f ${COMPOSE_FILE} down || true
+
+echo ""
+echo "Removing stopped containers..."
+docker container prune -f
+
+echo ""
+echo "Building and Starting Containers..."
+docker compose -f ${COMPOSE_FILE} up -d --build
+
+echo ""
+echo "Running Containers:"
+docker ps
+
+echo ""
+echo "Docker Images:"
+docker images | grep ${IMAGE_NAME} || true
+
+echo ""
+echo "Removing unused images..."
+docker image prune -f
+
+echo ""
+echo "Deployment completed successfully."
+
+EOF
+"""
+                }
+            }
+        }
+
+        stage('Health Check') {
+
+            steps {
+
+                sshagent(credentials: ['node-server-ssh']) {
+
+                    sh """
+ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} 'bash -s' <<'EOF'
+
+set -e
+
+echo "=========================================="
+echo "Waiting for Application"
+echo "=========================================="
+
+for i in {1..24}; do
+
+    if curl --fail --silent http://localhost:3000/accreditation/api/v1/health >/dev/null; then
+        echo "Application is healthy."
+        exit 0
+    fi
+
+    echo "Attempt \$i/24 - Waiting 5 seconds..."
+    sleep 5
+
+done
+
+echo "Application failed health check."
+exit 1
+
+EOF
+"""
+                }
+
+                sh """
+echo "=========================================="
+echo "External Health Check"
+echo "=========================================="
+
+curl --fail --show-error --silent --max-time 15 ${HEALTH_URL}
+
+echo ""
+echo "External Health Check Passed."
+"""
+            }
+        }
+    }
+
+    post {
+
+        success {
+
+            echo "====================================="
+            echo "RVSK DEV DEPLOYMENT SUCCESSFUL"
+            echo "====================================="
+        }
+
+        failure {
+
+            echo "====================================="
+            echo "RVSK DEV DEPLOYMENT FAILED"
+            echo "====================================="
+
+            sshagent(credentials: ['node-server-ssh']) {
+
+                sh """
+ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} << EOF
+
+echo ""
+echo "Container Status:"
+docker ps -a
+
+echo ""
+echo "Container Logs:"
+docker logs ${CONTAINER_NAME} || true
+
+EOF
+"""
+            }
+        }
+
+        always {
+            cleanWs()
+        }
+    }
+}

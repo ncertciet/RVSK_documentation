@@ -1,0 +1,48 @@
+services:
+
+  rvsk_accreditation_dev:
+
+    container_name: rvsk_accreditation_dev
+
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+
+    image: rvsk_accreditation_dev:latest
+
+    restart: unless-stopped
+
+    init: true
+
+    ports:
+      - "3000:3000"
+
+    env_file:
+      - .env
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q --spider http://localhost:3000/accreditation/api/v1/health || exit 1"
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+    stop_grace_period: 30s
+
+    networks:
+      - rvsk_network
+
+networks:
+
+  rvsk_network:
+    driver: bridge

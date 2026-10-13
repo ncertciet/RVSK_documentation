@@ -1,0 +1,76 @@
+# ==========================
+# Git
+# ==========================
+.git
+.gitignore
+
+# ==========================
+# Node dependencies
+# ==========================
+node_modules
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# ==========================
+# Build output
+# ==========================
+dist
+coverage
+.nyc_output
+
+# ==========================
+# Logs
+# ==========================
+logs
+*.log
+
+# ==========================
+# IDE / Editor
+# ==========================
+.vscode
+.idea
+*.swp
+*.swo
+
+# ==========================
+# OS files
+# ==========================
+.DS_Store
+Thumbs.db
+
+# ==========================
+# Documentation
+# ==========================
+docs
+*.md
+*.txt
+*.xlsx
+LICENSE
+
+# ==========================
+# Tests
+# ==========================
+test
+
+# ==========================
+# Local environment files
+# ==========================
+.env.local
+.env.test
+.env.*.local
+
+# Uncomment the next line only if you
+# DO NOT want .env inside the build context.
+# .env
+
+# ==========================
+# Docker
+# ==========================
+docker
+docker-compose*.yml
+
+# ==========================
+# Miscellaneous
+# ==========================
+.kiro
