@@ -1,0 +1,43 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+
+# Version control
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Test & coverage
+coverage
+.nyc_output
+
+# Environment (secrets)
+.env
+.env.local
+.env.*.local
+
+# Docker
+docker-compose.yml
+docker-compose.*.yml
+Dockerfile
+
+# Documentation & misc
+*.md
+!README.md
+*.xlsx
+*.txt
+LICENSE
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Kiro specs
+.kiro

@@ -1,0 +1,124 @@
+pipeline {
+    agent any
+
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '20'))
+    }
+
+    environment {
+        SERVER_IP = "10.249.96.94"
+        SERVER_USER = "nvsk_node_js_user"
+        APP_DIR = "/home/nvsk_node_js_user/rvsk_accreditation_v2"
+        HEALTH_URL = "http://localhost:3000/accreditation/api/v1/health"
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+
+                sshagent(credentials: ['production-node-ssh']) {
+
+                    sh """
+ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_IP} '
+set -e
+
+echo "======================================"
+echo "RVSK Accreditation V2 Deployment"
+echo "======================================"
+
+cd ${APP_DIR}
+
+echo "Current Branch:"
+git branch
+
+echo "Fetching latest code..."
+git fetch origin
+
+echo "Resetting to latest production branch..."
+git reset --hard origin/main
+
+echo "Validating docker-compose.yml..."
+docker-compose config -q
+
+echo "Stopping existing containers..."
+docker-compose down || true
+
+echo "Building Docker image..."
+docker-compose build
+
+echo "Starting containers..."
+docker-compose up -d
+
+echo "Waiting for application..."
+
+for i in {1..12}; do
+
+    if curl --silent --fail ${HEALTH_URL}; then
+        echo ""
+        echo "Application is healthy."
+        break
+    fi
+
+    echo "Waiting... (\$i/12)"
+    sleep 5
+
+    if [ "\$i" -eq 12 ]; then
+        echo "Health check failed."
+        exit 1
+    fi
+
+done
+
+echo ""
+echo "Running Container"
+
+docker ps --filter name=rvsk_accreditation_v2
+
+echo ""
+echo "Latest Logs"
+
+docker logs --tail 50 rvsk_accreditation_v2 || true
+
+echo ""
+echo "Docker Images"
+
+docker images | head
+
+echo ""
+echo "Cleaning old images"
+
+docker image prune -af --filter "until=24h"
+
+echo ""
+echo "Deployment completed successfully."
+'
+"""
+                }
+            }
+        }
+    }
+
+    post {
+
+        success {
+            echo "Deployment Successful"
+        }
+
+        failure {
+            echo "Deployment Failed"
+        }
+
+        always {
+            cleanWs()
+        }
+    }
+}
