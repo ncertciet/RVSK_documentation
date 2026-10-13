@@ -1,9 +1,10 @@
+```dockerfile
 # =============================================================================
 # RVSK Accreditation Platform - Multi-stage Dockerfile
 # =============================================================================
-# Stage 1: Development (full dev dependencies, hot-reload)
-# Stage 2: Build (compile TypeScript)
-# Stage 3: Production (minimal image, non-root user)
+# Stage 1: Development
+# Stage 2: Build
+# Stage 3: Production
 # =============================================================================
 
 # ---------------------------------------------------------------------------
@@ -13,18 +14,19 @@ FROM node:22-alpine AS development
 
 WORKDIR /app
 
-# Install dependencies first for better layer caching
+# Install dependencies
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# Copy source code
+# Copy application source
 COPY . .
 
 # Expose API port
 EXPOSE 3000
 
-# Default command for development (hot-reload)
+# Development command
 CMD ["npm", "run", "start:dev"]
+
 
 # ---------------------------------------------------------------------------
 # Stage 2: Build
@@ -33,46 +35,55 @@ FROM node:22-alpine AS build
 
 WORKDIR /app
 
+# Install dependencies
 COPY package.json package-lock.json ./
 RUN npm ci
 
+# Copy application source and compile TypeScript
 COPY . .
 RUN npm run build
 
-# Prune dev dependencies after build
+# Install production dependencies only
 RUN npm ci --omit=dev && npm cache clean --force
+
+# Create logs directory for the production image
+RUN mkdir -p /app/logs
+
 
 # ---------------------------------------------------------------------------
 # Stage 3: Production
 # ---------------------------------------------------------------------------
 FROM node:22-alpine AS production
 
+# Install wget for the health check
 RUN apk add --no-cache wget
 
-# Security: add non-root user
+# Create non-root user
 RUN addgroup -g 1001 -S appgroup && \
     adduser -S appuser -u 1001 -G appgroup
 
 WORKDIR /app
 
+# Create logs directory and set permissions
 RUN mkdir -p /app/logs && \
     chown -R appuser:appgroup /app
 
-# Copy only production artifacts
+# Copy production artifacts from the build stage
 COPY --from=build --chown=appuser:appgroup /app/dist ./dist
 COPY --from=build --chown=appuser:appgroup /app/node_modules ./node_modules
 COPY --from=build --chown=appuser:appgroup /app/package.json ./package.json
 COPY --from=build --chown=appuser:appgroup /app/logs ./logs
 
-# Security: run as non-root user
+# Run as non-root user
 USER appuser
 
 # Expose API port
 EXPOSE 3000
 
-# Health check
+# Container health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-CMD wget --spider --quiet http://localhost:3000/accreditation/api/v1/health || exit 1
+    CMD wget --spider --quiet http://localhost:3000/accreditation/api/v1/health || exit 1
 
-# Default command for production API
+# Start production API
 CMD ["node", "dist/main.js"]
+```
